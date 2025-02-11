@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
 func main() {
 
+	
 
 	start := time.Now()		// время запуска программы
 	defer func() {		// сколько времени ушло на программу
@@ -42,28 +44,34 @@ func main() {
 
 	scanner := bufio.NewScanner(file)		// 
 
-	for scanner.Scan() {
-		domen := scanner.Text()
-		url := "https://" + domen
-		fmt.Println(url)
-		if checkUrl(url) {
-			req, err := http.Get(url)
-			if err != nil {
-				fmt.Println("Ошибка get запроса, проверьте правильность url", err)
-				continue
-			}
-			defer req.Body.Close()
-			b, err := io.ReadAll(req.Body)
-			if err != nil{
-				fmt.Println("Ошибка чтения запроса")
-			}
-			createHtml(*path_input+"/"+domen, b)
-		} else {
-			fmt.Println("Ошибка правильность url адреса")
-			continue
-		}
+	wg := sync.WaitGroup{}
 
+	for scanner.Scan() {
+		wg.Add(1)
+		domen := scanner.Text()
+		go func () {
+			defer wg.Done()
+			url := "https://" + domen
+			fmt.Println(url)
+			if checkUrl(url) {
+				req, err := http.Get(url)
+				if err != nil {
+					fmt.Println("Ошибка get запроса, проверьте правильность url", err)
+				}
+				defer req.Body.Close()
+				b, err := io.ReadAll(req.Body)
+				if err != nil{
+					fmt.Println("Ошибка чтения запроса")
+				}
+				createHtml(*path_input+"/"+domen, b)
+			} else {
+				fmt.Println("Ошибка правильность url адреса")
+			}
+		}()
 	}
+
+	wg.Wait()
+
 }
 
 func checkUrl(s string) bool {		// функция валидации юрл
