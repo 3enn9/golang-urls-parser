@@ -5,44 +5,49 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
-	"strings"
+	"regexp"
 	"sync"
 	"time"
 )
 
 func main() {
 
-	
-
-	start := time.Now()		// время запуска программы
-	defer func() {		// сколько времени ушло на программу
-		fmt.Println("Прошло времени", time.Since(start))	
+	start := time.Now()		
+	defer func() {		
+		log.Println("Прошло времени", time.Since(start))	
 	}()
-	path_output := flag.String("src", "urls.txt", "Путь к файлу c url")		// путь к файлы с юрл
-	path_input := flag.String("dst", "./result", "Путь куда сохранить html страницы")	// путь к директории где хранить
+	path_output := flag.String("src", "", "Путь к файлу с URL-адресами. Укажите полный путь к файлу, содержащему список URL, которые нужно обработать.")
+	path_input := flag.String("dst", "", "Путь к директории для сохранения HTML-страниц. Укажите полный путь к директории, где будут сохранены загруженные HTML-страницы.")
 
 	flag.Parse()	
 
-	file, err := os.Open(*path_output)		// проверка на сущетсвования файла с юрл
-
+	file, err := os.Open(*path_output)	
 	if err != nil {																										
-		fmt.Println("Неверный путь к файлу или файл не существует")	
+		log.Println("Неверный путь к файлу или файл не существует", err)	
 		return
 	}
 	defer file.Close()
 
-	if _, err := os.Stat(*path_input); os.IsNotExist(err) {			// проверка на существаование директории
+	if _, err := os.Stat(*path_input); os.IsNotExist(err) {			
 
 		if err := os.MkdirAll(*path_input, os.ModePerm); err != nil {
-			fmt.Println("Ошибка при создании директории", err)
+			log.Println("Ошибка при создании директории", err)
 			return
 		}
-		fmt.Println("Директория создана")
+		log.Println("Директория создана")
 	}
 
-	scanner := bufio.NewScanner(file)		// 
+	readFile(file, path_input)
+	
+}
+
+// readFile считываем данные из файла, делаем get запросы
+func readFile(file *os.File, path_input *string)  {
+
+	scanner := bufio.NewScanner(file)
 
 	wg := sync.WaitGroup{}
 
@@ -51,21 +56,23 @@ func main() {
 		domen := scanner.Text()
 		go func () {
 			defer wg.Done()
-			url := "https://" + domen
+
+			url := "http://" + domen
 			fmt.Println(url)
 			if checkUrl(url) {
 				req, err := http.Get(url)
 				if err != nil {
-					fmt.Println("Ошибка get запроса, проверьте правильность url", err)
+					log.Println("Ошибка get запроса, проверьте корректность сайта", err)
+					return
 				}
 				defer req.Body.Close()
 				b, err := io.ReadAll(req.Body)
 				if err != nil{
-					fmt.Println("Ошибка чтения запроса")
+					log.Println("Ошибка чтения запроса", err)
 				}
 				createHtml(*path_input+"/"+domen, b)
 			} else {
-				fmt.Println("Ошибка правильность url адреса")
+				log.Println("Ошибка правильность url адреса")
 			}
 		}()
 	}
@@ -74,28 +81,30 @@ func main() {
 
 }
 
-func checkUrl(s string) bool {		// функция валидации юрл
+// checkUrl функция валидации юрл
+func checkUrl(s string) bool {		
 
-	array := strings.Split(s, ".")
-	return len(array) == 2
-
+	// Регулярное выражение для проверки корректности URL
+	re := regexp.MustCompile(`^(http|https)://[a-zA-Z0-9.-]+(:[0-9]+)?(/.*)?$`)
+	return re.MatchString(s)
 }
 
-func createHtml(path string, data []byte) {		// функция для создания html страниц
+// createHtml функция для создания html страниц
+func createHtml(path string, data []byte) error{		
 
 	file, err := os.Create(path + ".html")
 	if err != nil {
-		fmt.Println("Ошибка создания файла")
-		return
+		log.Println("Ошибка создания файла", err)
+		 return err
 	}
 	defer file.Close()
 
 	_, err = file.Write(data)
 
 	if err != nil {
-		fmt.Println("Ошибка при записи в файл")
-		return
+		log.Println("Ошибка при записи в файл", err)
+		return err
 	}
-	fmt.Println("Данные успешно записаны")
-
+	log.Println("Данные успешно записаны")
+	return nil
 }
