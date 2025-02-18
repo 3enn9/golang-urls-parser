@@ -19,10 +19,25 @@ func main() {
 	defer func() {		
 		log.Println("Прошло времени", time.Since(start))	
 	}()
-	path_output := flag.String("src", "", "Путь к файлу с URL-адресами. Укажите полный путь к файлу, содержащему список URL, которые нужно обработать.")
+	path_output := flag.String("src", "", "Путь к файлу с URL-адресами. Создайте файл и укажите полный путь к файлу, содержащему список URL, которые нужно обработать.")
 	path_input := flag.String("dst", "", "Путь к директории для сохранения HTML-страниц. Укажите полный путь к директории, где будут сохранены загруженные HTML-страницы.")
 
-	flag.Parse()	
+	// Кастомная функция для вывода справки
+	flag.Usage = func() {
+		fmt.Println("Использование программы:")
+		fmt.Println("  go run main.go -src <путь к файлу urls.txt> -dst <путь к директории для сохранения HTML>")
+		fmt.Println("Параметры:")
+		flag.PrintDefaults()
+	}
+
+	flag.Parse()
+
+	// Проверка обязательных флагов
+	if *path_output == "" || *path_input == "" {
+		fmt.Println("Ошибка: оба флага обязательны: -src и -dst.")
+		flag.Usage()
+		os.Exit(1)
+	}
 
 	file, err := os.Open(*path_output)	
 	if err != nil {																										
