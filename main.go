@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -69,10 +70,14 @@ func readFile(file *os.File, path_input *string)  {
 	for scanner.Scan() {
 		wg.Add(1)
 		domen := scanner.Text()
-		go func () {
+		go func (d string) {
 			defer wg.Done()
-
-			url := "http://" + domen
+			url := d
+			if !strings.Contains(d, "http://") &&  !strings.Contains(d, "https://"){
+				url = "http://" + d
+			}
+			parts := strings.Split(d, "//")
+			d = parts[len(parts)-1]
 			fmt.Println(url)
 			if checkUrl(url) {
 				req, err := http.Get(url)
@@ -85,11 +90,11 @@ func readFile(file *os.File, path_input *string)  {
 				if err != nil{
 					log.Println("Ошибка чтения запроса", err)
 				}
-				createHtml(*path_input+"/"+domen, b)
+				createHtml(*path_input+"/"+d, b)
 			} else {
-				log.Println("Ошибка правильность url адреса")
+				log.Println("Ошибка правильность url адреса", url)
 			}
-		}()
+		}(domen)
 	}
 
 	wg.Wait()
